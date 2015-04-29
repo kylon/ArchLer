@@ -457,9 +457,6 @@ case "$ipart" in
                 "o")
                 ;&
                 *)
-                    read -p "Enable multilib... Press a key to continue"
-                    sudo nano /etc/pacman.conf
-                    sudo pacman -Syy
                     sudo pacman -S $noc openbox xorg-server xorg-xinit nitrogen pulseaudio ntp
                     ;;
             esac;
