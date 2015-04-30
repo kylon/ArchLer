@@ -23,7 +23,7 @@ netctl_profile() {
     if [ "$prof" == "y" -o "$prof" == "" ]; then
         echo -n "Profile name: "
         read profn
-        netctl enable $profn
+        netctl enable "$profn"
     else
         echo
     fi
@@ -61,7 +61,7 @@ catalyst_driver() {
         sudo nano /etc/default/grub
         sudo grub-mkconfig -o /boot/grub/grub.cfg
         echo "Blacklisting radeon..."
-        sudo echo radeon > /etc/modprobe.d/modprobe.conf
+        echo 'radeon' | sudo tee -a /etc/modprobe.d/modprobe.conf > /dev/null
         echo "Running aticonfig..."
         sudo aticonfig --initial
 }
@@ -105,7 +105,7 @@ case "$ipart" in
         ########################################
         echo -n "loadkeys: "
         read lang
-        loadkeys $lang
+        loadkeys "$lang"
 
         ########################################
         # NETWORK CONFIGURATION
@@ -122,21 +122,21 @@ case "$ipart" in
                     echo -n "specify an interface (leave blank on most cases): "
                     read intf
                     if [ "$intf" != "" ]; then
-                        wifi-menu $intf
+                        wifi-menu "$intf"
                     else
                         wifi-menu
                     fi
                 else
                     echo -n "Select an interface: "
                     read intfc
-                    ip link set $intfc up
-                    iw dev $intfc scan | grep SSID
+                    ip link set "$intfc" up
+                    iw dev "$intfc" scan | grep SSID
                     echo -n "Select your SSID: "
                     read ssid
                     echo -n "$ssid password: "
                     read psk
-                    wpa_supplicant -B -i $intfc -c<(wpa_passphrase "$ssid" "$psk")
-                    dhcpcd $intfc
+                    wpa_supplicant -B -i "$intfc" -c<(wpa_passphrase "$ssid" "$psk")
+                    dhcpcd "$intfc"
                 fi
                 ;;
             "e")
@@ -144,7 +144,7 @@ case "$ipart" in
                 echo
                 echo -n "Select your interface: "
                 read ite
-                static_ip $ite
+                static_ip "$ite"
                 ;;
             "s")
                 echo "skipping..."
@@ -174,17 +174,17 @@ case "$ipart" in
             "p")
                 echo -n "select device or partition: /dev/"
                 read dev
-                parted /dev/$dev
+                parted /dev/"$dev"
                 ;;
             "f")
                 echo -n "select device or partition: /dev/"
                 read dev
-                fdisk /dev/$dev
+                fdisk /dev/"$dev"
                 ;;
             "g")
                 echo -n "select device or partition: /dev/"
                 read dev
-                gdisk /dev/$dev
+                gdisk /dev/"$dev"
                 ;;
             "s")
                 echo "skipping..."
@@ -201,9 +201,9 @@ case "$ipart" in
         echo -n "Select a filesystem (Enter = ext4): "
         read fs
         if [ "$fs" == "" -o "$fs" == "ext4" ]; then
-            mkfs.ext4 /dev/$pt
+            mkfs.ext4 /dev/"$pt"
         else
-            mkfs.$fs /dev/$pt
+            mkfs."$fs" /dev/"$pt"
         fi
 
         echo -n "Do you have a swap partition? (y/n) (Enter = n): "
@@ -211,8 +211,8 @@ case "$ipart" in
         if [ "$swp" == "y" ]; then
             echo -n "Select the swap partition: /dev/"
             read swpp
-            mkswap /dev/$swpp
-            swapon /dev/$swpp
+            mkswap /dev/"$swpp"
+            swapon /dev/"$swpp"
         else
             echo "skipping..."
         fi
@@ -221,7 +221,7 @@ case "$ipart" in
         # INSTALL ARCHLINUX
         ########################################
         echo "Mounting partition..."
-        mount /dev/$pt /mnt
+        mount /dev/"$pt" /mnt
 
         echo -n "Do you have a boot partition? (y/n) (Enter = n): "
         read bp
@@ -229,7 +229,7 @@ case "$ipart" in
             echo -n "Select the boot partition: /dev/"
             read bpp
             mkdir -p /mnt/boot
-            mount /dev/$bpp /mnt/boot
+            mount /dev/"$bpp" /mnt/boot
         else
             echo "skipping...."
         fi
@@ -240,7 +240,7 @@ case "$ipart" in
             echo -n "Select the home partition: /dev/"
             read hmp
             mkdir -p /mnt/home
-            mount /dev/$hmp /mnt/home
+            mount /dev/"$hmp" /mnt/home
         else
             echo "skipping...."
         fi
@@ -250,14 +250,14 @@ case "$ipart" in
         if [ "$cp" == "y" ]; then
             echo -n "How many partitions? (number): "
             read ncp
-            for i in {0..$ncp..1}
+            for ((i=0; i<ncp; i++))
                 do
                     echo -n "Select the partition: /dev/"
                     read cpp
                     echo -n "Select a mount point: /mnt/"
                     read cpmp
-                    mkdir -p /mnt/$cpmp
-                    mount /dev/$cpp /mnt/$cpmp
+                    mkdir -p /mnt/"$cpmp"
+                    mount /dev/"$cpp" /mnt/"$cpmp"
                 done
         else
             echo "skipping...."
@@ -282,17 +282,17 @@ case "$ipart" in
         echo -n "Set your LANG="
         read lng
         echo "Generating locale.conf..."
-        echo LANG=$lng > /etc/locale.conf
+        echo LANG="$lng" > /etc/locale.conf
         export LANG=$lng
 
         echo -n "KEYMAP (vconsole.conf): "
         read vcon
-        echo KEYMAP=$vcon > /etc/vconsole.conf
+        echo KEYMAP="$vcon" > /etc/vconsole.conf
 
         echo -n "Set your localtime: "
         read zone
         echo "Setting localtime..."
-        ln -s /usr/share/zoneinfo/$zone /etc/localtime
+        ln -s /usr/share/zoneinfo/"$zone" /etc/localtime
 
         echo "Setting Hardware Clock..."
         hwclock --systohc --utc
@@ -302,7 +302,7 @@ case "$ipart" in
         ########################################
         echo -n "Write your hostname: "
         read host
-        echo $host > /etc/hostname
+        echo "$host" > /etc/hostname
         read -p "Add your hostname to the hosts file... Press a key to continue"
         nano /etc/hosts
 
@@ -323,7 +323,7 @@ case "$ipart" in
                     echo -n "specify an interface (leave blank on most cases): "
                     read intf
                     if [ "$intf" != "" ]; then
-                        wifi-menu $intf
+                        wifi-menu "$intf"
                     else
                         wifi-menu
                     fi
@@ -342,7 +342,7 @@ case "$ipart" in
                     iw dev
                     echo -n "specify an interface: "
                     read intrf
-                    systemctl enable netctl-auto@$intrf.service
+                    systemctl enable netctl-auto@"$intrf".service
                 else
                     echo
                 fi
@@ -356,9 +356,9 @@ case "$ipart" in
                 echo -n "Select your interface: "
                 read ine
                 if [ "$ipm" == "d" ]; then
-                    systemctl enable dhcpcd@$ine.service
+                    systemctl enable dhcpcd@"$ine".service
                 else
-                    static_ip $ine
+                    static_ip "$ine"
                 fi
                 ;;
             "s")
@@ -404,7 +404,7 @@ case "$ipart" in
                     fi
                     echo -n "Select the target partition for grub: /dev/"
                     read tpart
-                    grub-install --target=i386-pc --force --recheck /dev/$tpart
+                    grub-install --target=i386-pc --force --recheck /dev/"$tpart"
                     echo -n "Edit grub parameters? (y/n) (Enter = n): "
                     read eg
                     if [ "$eg" == "y" ]; then
@@ -429,9 +429,9 @@ case "$ipart" in
             echo -n "Name: "
             read name
             echo "Creating user: $name, group: wheel..."
-            useradd -m -g wheel -s /bin/bash $name
+            useradd -m -g wheel -s /bin/bash "$name"
             echo "Set $name password: "
-            passwd $name
+            passwd "$name"
             read -p "Enable sudo, add \"yourname ALL=(ALL) ALL\" without quotes... Press a key to continue"
             nano /etc/sudoers
         else
@@ -497,24 +497,24 @@ case "$ipart" in
                 ;;
             "c")
                 echo "Adding catalyst repo to pacman.conf..."
-                sudo echo >> /etc/pacman.conf
-                sudo echo "[catalyst]" >> /etc/pacman.conf
-                sudo echo "Server = http://catalyst.wirephire.com/repo/catalyst/\$arch" >> /etc/pacman.conf
-                sudo echo "## Mirrors, if the primary server does not work or is too slow:" >> /etc/pacman.conf
-                sudo echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst/\$arch" >> /etc/pacman.conf
-                sudo echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" >> /etc/pacman.conf
-                sudo echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" >> /etc/pacman.conf
+                echo | sudo tee -a /etc/pacman.conf
+                echo "[catalyst]" | sudo tee -a /etc/pacman.conf
+                echo "Server = http://catalyst.wirephire.com/repo/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
+                echo "## Mirrors, if the primary server does not work or is too slow:" | sudo tee -a /etc/pacman.conf
+                echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
                 catalyst_driver
                 ;;
             "ca")
                 echo "Adding catalyst-hd234k repo to pacman.conf..."
-                sudo echo >> /etc/pacman.conf
-                sudo echo "[catalyst-hd234k]" >> /etc/pacman.conf
-                sudo echo "Server = http://catalyst.wirephire.com/repo/catalyst-hd234k/\$arch" >> /etc/pacman.conf
-                sudo echo "## Mirrors, if the primary server does not work or is too slow:" >> /etc/pacman.conf
-                sudo echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst-hd234k/\$arch" >> /etc/pacman.conf
-                sudo echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" >> /etc/pacman.conf
-                sudo echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" >> /etc/pacman.conf
+                echo | sudo tee -a /etc/pacman.conf
+                echo "[catalyst-hd234k]" | sudo tee -a /etc/pacman.conf
+                echo "Server = http://catalyst.wirephire.com/repo/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
+                echo "## Mirrors, if the primary server does not work or is too slow:" | sudo tee -a /etc/pacman.conf
+                echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
                 catalyst_driver
                 ;;
             "n")
@@ -531,10 +531,10 @@ case "$ipart" in
         echo -n "Do you want to install Yaourt? (y/n) (Enter = n): "
         read yt
         if [ "$yt" == "y" ]; then
-             sudo echo >> /etc/pacman.conf
-             sudo echo "[archlinuxfr]" >> /etc/pacman.conf
-             sudo echo "SigLevel = Never" >> /etc/pacman.conf
-             sudo echo "Server = http://repo.archlinux.fr/\$arch" >> /etc/pacman.conf
+             echo | sudo tee -a /etc/pacman.conf
+             echo "[archlinuxfr]" | sudo tee -a /etc/pacman.conf
+             echo "SigLevel = Never" | sudo tee -a /etc/pacman.conf
+             echo "Server = http://repo.archlinux.fr/\$arch" | sudo tee -a /etc/pacman.conf
              sudo pacman -Syy
              sudo pacman -S $noc yaourt
         else
@@ -549,7 +549,7 @@ case "$ipart" in
         if [ "$cfunc" == "y" ]; then
             echo -n "Path to your custom.sh: "
             read cpath
-            source $cpath/custom.sh
+            source "$cpath"/custom.sh
         else
             echo "skipping..."
         fi
