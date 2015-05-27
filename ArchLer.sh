@@ -10,7 +10,7 @@ echo     "######    #######     ##           ##########   ##         #########  
 echo    "#      #   ##    ###   ##           ##      ##   ##         ##         ##   ###"
 echo   "#        #  ##    ###   ##########   ##      ##   ########   #########  ##   ###"
 echo
-echo "v 1.0"
+echo "v 1.1"
 echo
 echo
 
@@ -31,9 +31,9 @@ netctl_profile() {
 
 fix_pacman_key() {
     if [ ! -d "/root/.gnupg" ]; then
-        sudo mkdir /root/.gnupg
-        sudo touch /root/.gnupg/dirmngr
-        sudo touch /root/.gnupg/dirmngr_ldapservers.conf
+        mkdir /root/.gnupg
+        touch /root/.gnupg/dirmngr
+        touch /root/.gnupg/dirmngr_ldapservers.conf
     else
         echo "Already fixed!"
     fi
@@ -42,32 +42,32 @@ fix_pacman_key() {
 catalyst_driver() {
         echo "Adding catalyst key to pacman..."
         fix_pacman_key
-        sudo pacman-key --init
-        sudo pacman-key -r 653C3094
-        sudo pacman-key --lsign-key 653C3094
+        pacman-key --init
+        pacman-key -r 653C3094
+        pacman-key --lsign-key 653C3094
         read -p "Enable multilib... Press a key to continue"
-        sudo nano /etc/pacman.conf
-        sudo pacman -Syy
+        nano /etc/pacman.conf
+        pacman -Syy
         echo -n "Do you have hybrid graphics card? (Intel/AMD) (y/n) (Enter = n): "
         read hyb
         if [ "$hyb" == "y" ]; then
-                sudo pacman -S catalyst-hook catalyst-utils-pxp lib32-catalyst-utils-pxp qt4 xf86-video-intel
+                pacman -S catalyst-hook catalyst-utils-pxp lib32-catalyst-utils-pxp qt4 xf86-video-intel
         else
-                sudo pacman -S catalyst-hook catalyst-utils catalyst-libgl opencl-catalyst lib32-catalyst-utils lib32-catalyst-libgl lib32-opencl-catalyst qt4
+                pacman -S catalyst-hook catalyst-utils catalyst-libgl opencl-catalyst lib32-catalyst-utils lib32-catalyst-libgl lib32-opencl-catalyst qt4
         fi
-        sudo systemctl enable catalyst-hook
-        sudo systemctl start catalyst-hook
+        systemctl enable catalyst-hook
+        systemctl start catalyst-hook
         if [ -f "/etc/default/grub" ]; then
             read -p "Add nomodeset to your grub boot parameters... Press a key to continue"
-            sudo nano /etc/default/grub
-            sudo grub-mkconfig -o /boot/grub/grub.cfg
+            nano /etc/default/grub
+            grub-mkconfig -o /boot/grub/grub.cfg
         else
             echo -n nomodeset >> /boot/loader/entries/arch.conf
         fi
         echo "Blacklisting radeon..."
-        echo 'radeon' | sudo tee -a /etc/modprobe.d/modprobe.conf > /dev/null
+        echo 'radeon' | tee -a /etc/modprobe.d/modprobe.conf > /dev/null
         echo "Running aticonfig..."
-        sudo aticonfig --initial
+        aticonfig --initial
 }
 
 static_ip() {
@@ -82,6 +82,11 @@ static_ip() {
         echo "static routers=$rot" > /etc/dhcpcd.conf
         echo "static domain_name_servers=$dns" > /etc/dhcpcd.conf
         systemctl restart dhcpcd.service
+}
+
+invalid() {
+	echo "Invalid option"
+	exit
 }
 ########################################
 # SETTINGS
@@ -99,7 +104,7 @@ fi
 ########################################
 # ARCHLER
 ########################################
-echo -n "Select an option ( i[nstall] - s[etup] - c[onfig] - h[elp] ): "
+echo -n "Select an option ( i[nstall] - s[etup] - c[onfig] - a[bout] ): "
 read ipart
 
 case "$ipart" in
@@ -154,8 +159,7 @@ case "$ipart" in
                 echo "skipping..."
                 ;;
             *)
-                echo "Invalid option"
-                exit
+                invalid
                 ;;
         esac;
 
@@ -369,8 +373,7 @@ case "$ipart" in
                 echo "skip"
                 ;;
             *)
-                echo "Invalid option"
-                exit
+                invalid
                 ;;
         esac;
 
@@ -459,29 +462,6 @@ case "$ipart" in
         ;;
     "c")
         ########################################
-        # INSTALL A DE
-        ########################################
-        echo -n "Install a Desktop Environment? (y/n) (Enter = y): "
-        read desk
-        if [ "$desk" == "y" -o "$desk" == "" ]; then
-            echo -n "Select your DE ( o[penbox] - x[fce4] ) (default: o): "
-            read de
-            case "$de" in
-                "x")
-                    sudo pacman -S $noc lightdm lightdm-gtk-greeter xfce4
-                    sudo systemctl enable lightdm.service
-                    ;;
-                "o")
-                ;&
-                *)
-                    sudo pacman -S $noc openbox xorg-server xorg-xinit nitrogen pulseaudio ntp
-                    ;;
-            esac;
-        else
-            echo "skipping..."
-        fi
-
-        ########################################
         # FIX THAT F* DIRMNGR
         ########################################
         echo -n "Do you want to fix pacman-key? (dirmngr and server errors) (y/n) (Enter = y): "
@@ -507,35 +487,35 @@ case "$ipart" in
         read gfx
         case "$gfx" in
             "i")
-                sudo pacman -S $noc xf86-video-intel
+                pacman -S $noc xf86-video-intel
                 ;;
             "a")
-                sudo pacman -S $noc xf86-video-ati
+                pacman -S $noc xf86-video-ati
                 ;;
             "c")
                 echo "Adding catalyst repo to pacman.conf..."
-                echo | sudo tee -a /etc/pacman.conf
-                echo "[catalyst]" | sudo tee -a /etc/pacman.conf
-                echo "Server = http://catalyst.wirephire.com/repo/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
-                echo "## Mirrors, if the primary server does not work or is too slow:" | sudo tee -a /etc/pacman.conf
-                echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
-                echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
-                echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" | sudo tee -a /etc/pacman.conf
+                echo | tee -a /etc/pacman.conf
+                echo "[catalyst]" | tee -a /etc/pacman.conf
+                echo "Server = http://catalyst.wirephire.com/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
+                echo "## Mirrors, if the primary server does not work or is too slow:" | tee -a /etc/pacman.conf
+                echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" | tee -a /etc/pacman.conf
                 catalyst_driver
                 ;;
             "ca")
                 echo "Adding catalyst-hd234k repo to pacman.conf..."
-                echo | sudo tee -a /etc/pacman.conf
-                echo "[catalyst-hd234k]" | sudo tee -a /etc/pacman.conf
-                echo "Server = http://catalyst.wirephire.com/repo/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
-                echo "## Mirrors, if the primary server does not work or is too slow:" | sudo tee -a /etc/pacman.conf
-                echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
-                echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
-                echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" | sudo tee -a /etc/pacman.conf
+                echo | tee -a /etc/pacman.conf
+                echo "[catalyst-hd234k]" | tee -a /etc/pacman.conf
+                echo "Server = http://catalyst.wirephire.com/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                echo "## Mirrors, if the primary server does not work or is too slow:" | tee -a /etc/pacman.conf
+                echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
                 catalyst_driver
                 ;;
             "n")
-                sudo pacman -S $noc xf86-video-nouveau
+                pacman -S $noc xf86-video-nouveau
                 ;;
             *)
                 echo "Invalid option, skipping..."
@@ -548,12 +528,12 @@ case "$ipart" in
         echo -n "Do you want to install Yaourt? (y/n) (Enter = n): "
         read yt
         if [ "$yt" == "y" ]; then
-             echo | sudo tee -a /etc/pacman.conf
-             echo "[archlinuxfr]" | sudo tee -a /etc/pacman.conf
-             echo "SigLevel = Never" | sudo tee -a /etc/pacman.conf
-             echo "Server = http://repo.archlinux.fr/\$arch" | sudo tee -a /etc/pacman.conf
-             sudo pacman -Syy
-             sudo pacman -S $noc yaourt
+             echo | tee -a /etc/pacman.conf
+             echo "[archlinuxfr]" | tee -a /etc/pacman.conf
+             echo "SigLevel = Never" | tee -a /etc/pacman.conf
+             echo "Server = http://repo.archlinux.fr/\$arch" | tee -a /etc/pacman.conf
+             pacman -Syy
+             pacman -S $noc yaourt
         else
              echo "skipping..."
         fi
@@ -571,7 +551,7 @@ case "$ipart" in
             echo "skipping..."
         fi
         ;;
-    "h")
+    "a")
         echo "Welcome to ArchLer!"
         echo "This script will help you to install ArchLinux quickly."
         echo
@@ -580,9 +560,11 @@ case "$ipart" in
         echo
         echo "Some things are still missing, like UEFI, nvidia nonfree drivers and more."
         echo "A manual installation/configuration is required for thoose packages"
+	echo
+	echo "Contributors:"
+	echo "maxweis (gummiboot support)"
         ;;
     *)
-        echo "Invalid option"
-        exit
+        invalid
         ;;
 esac;
