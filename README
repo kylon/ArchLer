@@ -4,12 +4,16 @@
 #      #   ##    ###   ##           ##      ##   ##         ##         ##   ###
 #        #  ##    ###   ##########   ##      ##   ########   #########  ##   ###
 
-Welcome to ArchLer!"
+Welcome to ArchLer!
 
-This script will help you to install ArchLinux quickly."
+This script will help you to install ArchLinux quickly.
 
-Choose (i) to install ArchLinux, choose (s) complete the installation in chroot, choose (c) to customize your ArchLinux box"
-The (c) option gives you the ability to load an external script (custom.sh) to do everything you need to complete the configuration of your newly installed os"
+Choose (i) to install ArchLinux, choose (s) to complete the installation in chroot, choose (c) to customize your ArchLinux box.
+The (c) option gives you the ability to load an external script (custom.sh) to do everything you need to complete the configuration of your newly installed os.
 
-Some things are still missing, like UEFI, nvidia nonfree drivers and more."
-A manual installation/configuration is required for thoose packages"
+Some things are still missing, like UEFI, nvidia nonfree drivers and more.
+A manual installation/configuration is required for thoose packages.
+
+
+Contributors:
+- maxweis (gummiboot support)
