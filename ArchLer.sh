@@ -57,9 +57,13 @@ catalyst_driver() {
         fi
         sudo systemctl enable catalyst-hook
         sudo systemctl start catalyst-hook
-        read -p "Add nomodeset to your grub boot parameters... Press a key to continue"
-        sudo nano /etc/default/grub
-        sudo grub-mkconfig -o /boot/grub/grub.cfg
+        if [ -f "/etc/default/grub" ]; then
+            read -p "Add nomodeset to your grub boot parameters... Press a key to continue"
+            sudo nano /etc/default/grub
+            sudo grub-mkconfig -o /boot/grub/grub.cfg
+        else
+            echo -n nomodeset >> /boot/loader/entries/arch.conf
+        fi
         echo "Blacklisting radeon..."
         echo 'radeon' | sudo tee -a /etc/modprobe.d/modprobe.conf > /dev/null
         echo "Running aticonfig..."
@@ -388,10 +392,14 @@ case "$ipart" in
         echo -n "Install bootloader? (y/n) (Enter = y): "
         read boot
         if [ "$boot" == "y" -o "$boot" == "" ]; then
-            echo -n "Select a bootloader ( g[rub] ) (Enter = g): "
+            if [ -d /sys/firmware/efi ] ; then
+                echo -n "Select a bootloader ( gr[ub] - gu[mmiboot] ) (Enter = gr): "
+            else
+                echo -n "Select a bootloader ( gr[ub] ) (Enter = gr): "
+            fi
             read loader
             case "$loader" in
-                "g")
+                "gr")
                 ;&
                 *)
                     pacman -S $noc grub
@@ -414,6 +422,15 @@ case "$ipart" in
                     fi
                     echo "Generating grub config..."
                     grub-mkconfig -o /boot/grub/grub.cfg
+                    ;;
+                "gu")
+                    pacman -S $noc gummiboot
+                    echo -n "Select the target partition for gummiboot: /dev/"
+                    read tpart
+                    gummiboot --path=/dev/"$tpart" install
+                    root="$(df / | awk '/dev/{printf("%s", $1)}')"
+                    echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\tinitramfs-linux.img\\troot=$root rw > /dev/"$tpart"/loader/entries/arch.conf
+                    echo -e default arch\\ntimeout arch > /dev/"$tpart"/loader/loader.conf
                     ;;
             esac;
         else
