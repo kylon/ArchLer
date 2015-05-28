@@ -1,8 +1,14 @@
 #!/bin/bash
+
 if [ $EUID != 0 ]; then
     echo "Please run as root"
     exit
 fi
+
+########################################
+# FUNCTIONS
+########################################
+draw_logo() {
 clear
 echo       "###     ########    ##########   ##      ##   ##         #########  ########"
 echo      "#   #    ##    ##    ##           ##      ##   ##         ##         ##    ##"
@@ -10,13 +16,11 @@ echo     "######    #######     ##           ##########   ##         #########  
 echo    "#      #   ##    ###   ##           ##      ##   ##         ##         ##   ###"
 echo   "#        #  ##    ###   ##########   ##      ##   ########   #########  ##   ###"
 echo
-echo "v 1.1"
+echo "v 1.2"
 echo
 echo
+}
 
-########################################
-# FUNCTIONS
-########################################
 netctl_profile() {
     echo -n "enable your profile? (y/n) (Enter = y): "
     read prof
@@ -85,26 +89,37 @@ static_ip() {
 }
 
 invalid() {
-	echo "Invalid option"
-	exit
+	echo "Invalid option!"
 }
+
+skip() {
+	echo "skipdping..."
+}
+
+draw_logo
+
 ########################################
 # SETTINGS
 ########################################
 echo -n "No prompt mode? (y/n) (Enter = y): "
 read nop
 if [ "$nop" == "" -o "$nop" == "y" ]; then
-    i=""
-    noc="--noconfirm"
+    	i=""
+    	noc="--noconfirm"
 else
-    i="-i"
-    noc=""
+	if [ "$nop" != "n" ]; then
+		echo "Assuming 'n'"
+	fi
+    	i="-i"
+    	noc=""
 fi
 
 ########################################
 # ARCHLER
 ########################################
-echo -n "Select an option ( i[nstall] - s[etup] - c[onfig] - a[bout] ): "
+while true
+do
+echo -n "Select an option ( i[nstall] - s[etup] - c[onfig] - a[bout] - e[xit] ): "
 read ipart
 
 case "$ipart" in
@@ -119,6 +134,8 @@ case "$ipart" in
         ########################################
         # NETWORK CONFIGURATION
         ########################################
+	while true
+	do
         echo -n "select your network configuration ( w[ireless] - e[th - static IP] - s[kip] ): "
         read nt
 
@@ -147,6 +164,7 @@ case "$ipart" in
                     wpa_supplicant -B -i "$intfc" -c<(wpa_passphrase "$ssid" "$psk")
                     dhcpcd "$intfc"
                 fi
+		break
                 ;;
             "e")
                 ip link
@@ -154,14 +172,17 @@ case "$ipart" in
                 echo -n "Select your interface: "
                 read ite
                 static_ip "$ite"
+		break
                 ;;
             "s")
-                echo "skipping..."
+                skip
+		break
                 ;;
             *)
                 invalid
                 ;;
         esac;
+	done
 
         ########################################
         # CREATE PARTITION/S
@@ -175,34 +196,45 @@ case "$ipart" in
             echo
         fi
 
+	while true
+	do
         echo -n "Select a partitioning tool ( p[arted] - c[fdisk] - f[disk] - g[disk] - s[kip] ) (Enter = c): "
         read ptool
-
+	
         case "$ptool" in
             "p")
                 echo -n "select device or partition: /dev/"
                 read dev
                 parted /dev/"$dev"
+		break
                 ;;
             "f")
                 echo -n "select device or partition: /dev/"
                 read dev
                 fdisk /dev/"$dev"
+		break
                 ;;
             "g")
                 echo -n "select device or partition: /dev/"
                 read dev
                 gdisk /dev/"$dev"
-                ;;
-            "s")
-                echo "skipping..."
+		break
                 ;;
             "c")
-                ;&
+		;&
+	    "")
+		cfdisk
+		break
+                ;;
+	    "s")
+                skip
+		break
+                ;;
             *)
-                cfdisk
+                invalid
                 ;;
         esac;
+	done
 
         echo -n "Select the ArchLinux partition: /dev/"
         read pt
@@ -222,7 +254,7 @@ case "$ipart" in
             mkswap /dev/"$swpp"
             swapon /dev/"$swpp"
         else
-            echo "skipping..."
+            skip
         fi
 
         ########################################
@@ -278,6 +310,7 @@ case "$ipart" in
 
         read -p "Entering arch-chroot, to continue the installation run ArchLer again and select setup... Press a key to continue"
         arch-chroot /mnt /bin/bash
+	break
         ;;
     "s")
         ########################################
@@ -297,7 +330,7 @@ case "$ipart" in
         read vcon
         echo KEYMAP="$vcon" > /etc/vconsole.conf
 
-        echo -n "Set your localtime: "
+        echo -n "Set your localtime (ex. Europe/Rome): "
         read zone
         echo "Setting localtime..."
         ln -s /usr/share/zoneinfo/"$zone" /etc/localtime
@@ -314,6 +347,8 @@ case "$ipart" in
         read -p "Add your hostname to the hosts file... Press a key to continue"
         nano /etc/hosts
 
+	while true
+	do
         echo -n "select your network configuration ( w[ireless] - e[th] - s[kip] ): "
         read ntw
 
@@ -354,28 +389,39 @@ case "$ipart" in
                 else
                     echo
                 fi
+		break
                 ;;
             "e")
-                echo -n "Select a method ( s[tatic IP] - d[hcpcd] ): "
+		while true
+		do
+                echo -n "Select a method ( s[tatic IP] - d[hcpcd] ) (Enter = d): "
                 read ipm
                 echo
                 ip link
                 echo
                 echo -n "Select your interface: "
                 read ine
-                if [ "$ipm" == "d" ]; then
-                    systemctl enable dhcpcd@"$ine".service
-                else
-                    static_ip "$ine"
+                if [ "$ipm" == "" -o "$ipm" == "d" ]; then
+                    	systemctl enable dhcpcd@"$ine".service
+			break
+                elif [ "$ipm" == "s" ]; then
+                    	static_ip "$ine"
+			break
+		else
+			invalid
                 fi
+		done
+		break
                 ;;
             "s")
-                echo "skip"
+                skip
+		break
                 ;;
             *)
                 invalid
                 ;;
         esac;
+	done
 
         ########################################
         # RAMDISK
@@ -395,23 +441,25 @@ case "$ipart" in
         echo -n "Install bootloader? (y/n) (Enter = y): "
         read boot
         if [ "$boot" == "y" -o "$boot" == "" ]; then
-            if [ -d /sys/firmware/efi ] ; then
+	    while true
+	    do
+            if [ -d /sys/firmware/efi ]; then
                 echo -n "Select a bootloader ( gr[ub] - gu[mmiboot] ) (Enter = gr): "
             else
                 echo -n "Select a bootloader ( gr[ub] ) (Enter = gr): "
             fi
             read loader
             case "$loader" in
-                "gr")
-                ;&
-                *)
-                    pacman -S $noc grub
+                "")
+                    ;&
+		"gr")
+		    pacman -S $noc grub
                     echo -n "Scan all oses? (y/n) (Enter = n): "
                     read scan
                     if [ "$scan" == "y" ]; then
                         pacman -S $noc os-prober
                     else
-                        echo "skipping..."
+                        skip
                     fi
                     echo -n "Select the target partition for grub: /dev/"
                     read tpart
@@ -425,7 +473,8 @@ case "$ipart" in
                     fi
                     echo "Generating grub config..."
                     grub-mkconfig -o /boot/grub/grub.cfg
-                    ;;
+		    break
+		    ;;
                 "gu")
                     pacman -S $noc gummiboot
                     echo -n "Select the target partition for gummiboot: /dev/"
@@ -434,10 +483,18 @@ case "$ipart" in
                     root="$(df / | awk '/dev/{printf("%s", $1)}')"
                     echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\tinitramfs-linux.img\\troot=$root rw > /dev/"$tpart"/loader/entries/arch.conf
                     echo -e default arch\\ntimeout arch > /dev/"$tpart"/loader/loader.conf
+		    break
+                    ;;
+		*)
+                    invalid
                     ;;
             esac;
+	    done
         else
-            echo "skipping..."
+	    if [ "$boot" != "n" ]; then
+		echo "Assuming 'n'"
+	    fi
+            skip
         fi
 
         ########################################
@@ -459,7 +516,8 @@ case "$ipart" in
         fi
 
         read -p "Done! reboot, run ArchLer.sh from your newly installed OS and select config... Press a key to continue"
-        ;;
+	break        
+	;;
     "c")
         ########################################
         # FIX THAT F* DIRMNGR
@@ -469,7 +527,7 @@ case "$ipart" in
         if [ "$fdir" == "" -o "$fdir" == "y" ]; then
             fix_pacman_key
         else
-            echo "skipping..."
+            skip
         fi
 
         ########################################
@@ -483,14 +541,18 @@ case "$ipart" in
             echo
         fi
 
+	while true
+	do
         echo -n "Select a gfx driver ( i[ntel] - a[ti] - c[atalyst] - ca[talyst-hd234k] - n[ouveau] ): "
         read gfx
         case "$gfx" in
             "i")
                 pacman -S $noc xf86-video-intel
+		break
                 ;;
             "a")
                 pacman -S $noc xf86-video-ati
+		break
                 ;;
             "c")
                 echo "Adding catalyst repo to pacman.conf..."
@@ -502,6 +564,7 @@ case "$ipart" in
                 echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
                 echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" | tee -a /etc/pacman.conf
                 catalyst_driver
+		break
                 ;;
             "ca")
                 echo "Adding catalyst-hd234k repo to pacman.conf..."
@@ -513,14 +576,17 @@ case "$ipart" in
                 echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
                 echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
                 catalyst_driver
+		break
                 ;;
             "n")
                 pacman -S $noc xf86-video-nouveau
+		break
                 ;;
             *)
-                echo "Invalid option, skipping..."
+                invalid
                 ;;
         esac;
+	done
 
         ########################################
         # AUR
@@ -535,7 +601,7 @@ case "$ipart" in
              pacman -Syy
              pacman -S $noc yaourt
         else
-             echo "skipping..."
+             skip
         fi
 
         ########################################
@@ -548,23 +614,33 @@ case "$ipart" in
             read cpath
             source "$cpath"/custom.sh
         else
-            echo "skipping..."
+            skip
         fi
+	break
         ;;
     "a")
-        echo "Welcome to ArchLer!"
-        echo "This script will help you to install ArchLinux quickly."
+	draw_logo
+        echo "Options:"
         echo
-        echo "Choose (i) to install ArchLinux, choose (s) complete the installation in chroot, choose (c) to customize your ArchLinux box"
-        echo "The (c) option gives you the ability to load an external script (custom.sh) to do everything you need to complete the configuration of your newly installed os"
+        echo "[i]: Install ArchLinux;"
+	echo
+	echo "[s]: Initial configuration (arch-chroot);"
+	echo
+	echo "[c]: Customize your ArchLinux box. This option gives you the ability to load an external script (custom.sh);"
         echo
-        echo "Some things are still missing, like UEFI, nvidia nonfree drivers and more."
-        echo "A manual installation/configuration is required for thoose packages"
+        echo "Some things are still missing, like a full efi support, nvidia nonfree drivers and more."
+        echo "A manual installation/configuration is required for thoose packages."
 	echo
 	echo "Contributors:"
 	echo "maxweis (gummiboot support)"
+	echo
+	echo
         ;;
+    "e")
+	break
+	;;
     *)
         invalid
         ;;
 esac;
+done
