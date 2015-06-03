@@ -11,9 +11,17 @@ This script will help you to install ArchLinux quickly.
 Choose (i) to install ArchLinux, choose (s) to complete the installation in chroot, choose (c) to customize your ArchLinux box.
 The (c) option gives you the ability to load an external script (custom.sh) to do everything you need to complete the configuration of your newly installed os.
 
-Some things are still missing, like UEFI, nvidia nonfree drivers and more.
+Some things are still missing, like nvidia nonfree drivers and more.
 A manual installation/configuration is required for thoose packages.
 
+
+Changes:
+    1.1
+        gummiboot support (maxweis)
+    1.2
+        clean up
+    2.0
+        efi support, clean up and fixes
 
 Contributors:
 - maxweis (gummiboot support)

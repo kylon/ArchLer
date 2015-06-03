@@ -9,6 +9,11 @@ fi
 # FUNCTIONS
 ########################################
 draw_logo() {
+    if [ "$efi" == "yes" ]; then
+        bootmode="UEFI"
+    else
+        bootmode="LEGACY/BIOS"
+    fi
     clear
     echo       "###     ########    ##########   ##      ##   ##         #########  ########"
     echo      "#   #    ##    ##    ##           ##      ##   ##         ##         ##    ##"
@@ -16,20 +21,16 @@ draw_logo() {
     echo    "#      #   ##    ###   ##           ##      ##   ##         ##         ##   ###"
     echo   "#        #  ##    ###   ##########   ##      ##   ########   #########  ##   ###"
     echo
-    echo "v 1.2"
+    echo "v 2.0 -- $bootmode MODE"
     echo
     echo
 }
 
 netctl_profile() {
-    echo -n "enable your profile? (y/n) (Enter = y): "
-    read prof
-    if [ "$prof" == "y" -o "$prof" == "" ]; then
-        echo -n "Profile name: "
-        read profn
-        netctl enable "$profn"
-    else
-        echo
+    ask "enable your profile? (y/n) (Enter = y): "
+    if [ "$inpt" == "y" -o "$inpt" == "" ]; then
+        ask "Profile name: "
+        netctl enable "$inpt"
     fi
 }
 
@@ -54,13 +55,14 @@ catalyst_driver() {
     nano /etc/pacman.conf
     pacman -Syy
 
-    echo -n "Do you have hybrid graphics card? (Intel/AMD) (y/n) (Enter = n): "
-    read hyb
-    if [ "$hyb" == "y" ]; then
-        pacman -S catalyst-hook catalyst-utils-pxp lib32-catalyst-utils-pxp qt4 xf86-video-intel
+    ask "Do you have hybrid graphics card? (Intel/AMD) (y/n) (Enter = n): "
+    if [ "$inpt" == "y" ]; then
+        drvpk="catalyst-utils-pxp lib32-catalyst-utils-pxp xf86-video-intel"
     else
-        pacman -S catalyst-hook catalyst-utils catalyst-libgl opencl-catalyst lib32-catalyst-utils lib32-catalyst-libgl lib32-opencl-catalyst qt4
+        drvpk="catalyst-utils catalyst-libgl opencl-catalyst lib32-catalyst-utils lib32-catalyst-libgl lib32-opencl-catalyst"
     fi
+
+    pacman -S $noc catalyst-hook qt4 $drvpk
 
     systemctl enable catalyst-hook
     systemctl start catalyst-hook
@@ -80,12 +82,12 @@ catalyst_driver() {
 }
 
 static_ip() {
-    echo -n "IP address: "
-    read ipa
-    echo -n "Router: "
-    read rot
-    echo -n "DNS: "
-    read dns
+    ask "IP address: "
+    ipa="$inpt"
+    ask "Router: "
+    rot="$inpt"
+    ask "DNS: "
+    dns="$inpt"
     echo "interface $1" > /etc/dhcpcd.conf
     echo "static ip_address=$ipa" > /etc/dhcpcd.conf
     echo "static routers=$rot" > /etc/dhcpcd.conf
@@ -93,30 +95,47 @@ static_ip() {
     systemctl restart dhcpcd.service
 }
 
-invalid() {
-    echo "Invalid option!"
+err() {
+    if [ "$1" == "inv" ]; then
+        echo "Invalid option!"
+    else
+        echo "skipping..."
+    fi
 }
 
-skip() {
-    echo "skipdping..."
+ask() {
+    echo -n "$1"
+    read inpt
 }
 
-draw_logo
+check() {
+    if [ "$?" -ne "0" ]; then
+        err inv
+        continue
+    else
+        break
+    fi
+}
 
 ########################################
 # SETTINGS
 ########################################
-echo -n "No prompt mode? (y/n) (Enter = y): "
-read nop
-if [ "$nop" == "" -o "$nop" == "y" ]; then
+i="-i"
+noc=""
+efi="no"
+
+if [ -d /sys/firmware/efi ]; then
+    efi="yes"
+fi
+
+draw_logo
+
+ask "No prompt mode? (y/n) (Enter = y): "
+if [ "$inpt" == "" -o "$inpt" == "y" ]; then
     i=""
     noc="--noconfirm"
 else
-    if [ "$nop" != "n" ]; then
-        echo "Assuming 'n'"
-    fi
-    i="-i"
-    noc=""
+    echo "Assuming 'n'"
 fi
 
 ########################################
@@ -124,48 +143,43 @@ fi
 ########################################
 while true
 do
-    echo -n "Select an option ( i[nstall] - s[etup] - c[onfig] - a[bout] - e[xit] ): "
-    read ipart
+    ask "Select an option ( i[nstall] - s[etup] - c[onfig] - a[bout] - e[xit] ): "
 
-    case "$ipart" in
+    case "$inpt" in
         "i")
             ########################################
             # LOADKEYS
             ########################################
-            echo -n "loadkeys: "
-            read lang
-            loadkeys "$lang"
+            while true
+            do
+            	ask "loadkeys: "
+            	loadkeys "$inpt"
+                check
+            done
 
             ########################################
             # NETWORK CONFIGURATION
             ########################################
             while true
             do
-                echo -n "select your network configuration ( w[ireless] - e[th - static IP] - s[kip] ): "
-                read nt
+                ask "select your network configuration ( w[ireless] - e[th - static IP] - s[kip] ): "
 
-                case "$nt" in
+		case "$inpt" in
                     "w")
                         iw dev
-                        echo -n "Do you want to use wifi-menu (y/n) (Enter = y): "
-                        read rewm
-                        if [ "$rewm" == "y" -o "$rewm" == "" ]; then
-                            echo -n "specify an interface (leave blank on most cases): "
-                            read intf
-                            if [ "$intf" != "" ]; then
-                                wifi-menu "$intf"
-                            else
-                                wifi-menu
-                            fi
+                        ask "Do you want to use wifi-menu (y/n) (Enter = y): "
+                        if [ "$inpt" == "y" -o "$inpt" == "" ]; then
+                            ask "specify an interface (leave blank on most cases): "
+                            wifi-menu "$inpt"
                         else
-                            echo -n "Select an interface: "
-                            read intfc
-                            ip link set "$intfc" up
-                            iw dev "$intfc" scan | grep SSID
-                            echo -n "Select your SSID: "
-                            read ssid
-                            echo -n "$ssid password: "
-                            read psk
+                            ask "Select an interface: "
+                            ip link set "$inpt" up
+							intfc="$inpt"
+                            iw dev "$inpt" scan | grep SSID
+                            ask "Select your SSID: "
+                            ssid="$inpt"
+                            ask "$ssid password: "
+                            psk="$inpt"
                             wpa_supplicant -B -i "$intfc" -c<(wpa_passphrase "$ssid" "$psk")
                             dhcpcd "$intfc"
                         fi
@@ -174,17 +188,16 @@ do
                     "e")
                         ip link
                         echo
-                        echo -n "Select your interface: "
-                        read ite
-                        static_ip "$ite"
+                        ask "Select your interface: "
+                        static_ip "$inpt"
                         break
                         ;;
                     "s")
-                        skip
+                        err sk
                         break
                         ;;
                     *)
-                        invalid
+                        err inv
                         ;;
                 esac;
             done
@@ -192,120 +205,165 @@ do
             ########################################
             # CREATE PARTITION/S
             ########################################
-            echo -n "List all partitions? (y/n) (Enter = n): "
-            read lp
-            if [ "$lp" == "y" ]; then
+            ask "Print partitions details? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
                 clear
                 fdisk -l | more
-            else
-                echo
             fi
 
             while true
             do
-                echo -n "Select a partitioning tool ( p[arted] - c[fdisk] - f[disk] - g[disk] - s[kip] ) (Enter = c): "
-                read ptool
+                if [ "$efi" == "yes" ]; then
+                    efipa="- g[pt/UEFI]"
+                else
+                    efipa=""
+                fi
 
-                case "$ptool" in
-                    "p")
-                        echo -n "select device or partition: /dev/"
-                        read dev
-                        parted /dev/"$dev"
-                        break
-                        ;;
-                    "f")
-                        echo -n "select device or partition: /dev/"
-                        read dev
-                        fdisk /dev/"$dev"
+                echo "WARNING: THIS ACTION WILL ERASE YOUR HDD!"
+                ask "Create a new partition table ( m[br/BIOS] $efipa - s[kip] ) (Enter = s): "
+
+                case "$inpt" in
+                    "m")
+                        ask "Select a device: /dev/"
+                        parted /dev/"$inpt" mklabel msdos
                         break
                         ;;
                     "g")
-                        echo -n "select device or partition: /dev/"
-                        read dev
-                        gdisk /dev/"$dev"
+                        if [ "$efi" == "no" ]; then
+                            err inv
+                            continue
+                        fi
+                        esize="513"
+                        ask "Select a device (an ESP partition will be created): /dev/"
+                        epart="$inpt"
+                        ask "Size of the ESP partition in MiB (Enter = 513): "
+                        if [ "$inpt" != "" ]; then
+                            esize="$inpt"
+                        fi
+                        parted /dev/"$epart" mklabel gpt
+                        parted /dev/"$epart" mkpart ESP fat32 1MiB "$esize"MiB
+                        parted /dev/"$epart" set 1 boot on
+                        mkfs.msdos -F 32 /dev/"$epart"1
                         break
                         ;;
-                    "c")
-                        ;&
                     "")
-                        cfdisk
-                        break
-                        ;;
+                        ;&
                     "s")
-                        skip
+                        err sk
                         break
                         ;;
                     *)
-                        invalid
+                        err inv
                         ;;
                 esac;
             done
 
-            echo -n "Select the ArchLinux partition: /dev/"
-            read pt
-            echo -n "Select a filesystem (Enter = ext4): "
-            read fs
-            if [ "$fs" == "" -o "$fs" == "ext4" ]; then
-                mkfs.ext4 /dev/"$pt"
+            while true
+            do
+                ask "Select a partitioning tool ( p[arted] - c[fdisk] - f[disk] - g[disk] - s[kip] ) (Enter = c): "
+
+                case "$inpt" in
+                    "p")
+                        ask "select device or partition: /dev/"
+                        parted /dev/"$inpt"
+                        break
+                        ;;
+                    "f")
+                        ask "select device or partition: /dev/"
+                        fdisk /dev/"$inpt"
+                        break
+                        ;;
+                    "g")
+                        ask "select device or partition: /dev/"
+                        gdisk /dev/"$inpt"
+                        break
+                        ;;
+                    "")
+                        ;&
+                    "c")
+                        cfdisk
+                        break
+                        ;;
+                    "s")
+                        err sk
+                        break
+                        ;;
+                    *)
+                        err inv
+                        ;;
+                esac;
+            done
+
+            ask "Select the ArchLinux partition: /dev/"
+            archpt="$inpt"
+            ask "Select a filesystem (Enter = ext4): "
+            if [ "$inpt" == "" -o "$inpt" == "ext4" ]; then
+                mkfs.ext4 /dev/"$archpt"
             else
-                mkfs."$fs" /dev/"$pt"
+                mkfs."$inpt" /dev/"$archpt"
             fi
 
-            echo -n "Do you have a swap partition? (y/n) (Enter = n): "
-            read swp
-            if [ "$swp" == "y" ]; then
-                echo -n "Select the swap partition: /dev/"
-                read swpp
-                mkswap /dev/"$swpp"
-                swapon /dev/"$swpp"
+            ask "Do you have a swap partition? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
+                ask "Select the swap partition: /dev/"
+                mkswap /dev/"$inpt"
+                swapon /dev/"$inpt"
             else
-                skip
+                err sk
             fi
 
             ########################################
             # INSTALL ARCHLINUX
             ########################################
             echo "Mounting partition..."
-            mount /dev/"$pt" /mnt
+            mount /dev/"$archpt" /mnt
 
-            echo -n "Do you have a boot partition? (y/n) (Enter = n): "
-            read bp
-            if [ "$bp" == "y" ]; then
-                echo -n "Select the boot partition: /dev/"
-                read bpp
-                mkdir -p /mnt/boot
-                mount /dev/"$bpp" /mnt/boot
+            if [ "$efi" == "no" ]; then
+                ask "Do you have a boot partition? (y/n) (Enter = n): "
+                if [ "$inpt" == "y" ]; then
+                    ask "Select the boot partition: /dev/"
+                    mkdir -p /mnt/boot
+                    mount /dev/"$inpt" /mnt/boot
+                else
+                    err sk
+                fi
             else
-                echo "skipping...."
+                ask "Select your EFI partition: /dev/"
+                efip="$inpt"
+                ask "Create a mount point for the EFI partition (Enter = /mnt/boot): /mnt/boot/"
+                if [ "$inpt" == "" -o "$inpt" == "/mnt/boot" ]; then
+                    mkdir -p /mnt/boot
+                    mount /dev/"$efip" /mnt/boot
+                else
+                    mkdir -p /mnt/boot/"$inpt"
+                    mount /dev/"$efip" /mnt/boot/"$inpt"
+                fi
             fi
 
-            echo -n "Do you have a home partition? (y/n) (Enter = n): "
-            read hm
-            if [ "$hm" == "y" ]; then
-                echo -n "Select the home partition: /dev/"
-                read hmp
+            ask "Do you have a home partition? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
+                ask "Select the home partition: /dev/"
                 mkdir -p /mnt/home
-                mount /dev/"$hmp" /mnt/home
+                mount /dev/"$inpt" /mnt/home
             else
-                echo "skipping...."
+                err sk
             fi
 
-            echo -n "Do you have custom partitions? (y/n) (Enter = n): "
-            read cp
-            if [ "$cp" == "y" ]; then
-                echo -n "How many partitions? (number): "
-                read ncp
-                for ((i=0; i<ncp; i++))
+            ask "Do you have custom partitions? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
+                ask "How many partitions? (number): "
+                limit="$inpt"
+                for ((i=0; i<limit; i++))
                     do
-                        echo -n "Select the partition: /dev/"
-                        read cpp
-                        echo -n "Select a mount point: /mnt/"
-                        read cpmp
+                        ask "Select the partition: /dev/"
+                        cpp="$inpt"
+                        ask "Select a mount point: /mnt/"
+                        cpmp="$inpt"
                         mkdir -p /mnt/"$cpmp"
                         mount /dev/"$cpp" /mnt/"$cpmp"
                     done
             else
-                echo "skipping...."
+                err sk
             fi
 
             pacstrap $i /mnt base base-devel
@@ -325,20 +383,17 @@ do
             nano /etc/locale.gen
             locale-gen
 
-            echo -n "Set your LANG="
-            read lng
+            ask "Set your LANG="
             echo "Generating locale.conf..."
-            echo LANG="$lng" > /etc/locale.conf
-            export LANG=$lng
+            echo LANG="$inpt" > /etc/locale.conf
+            export LANG=$inpt
 
-            echo -n "KEYMAP (vconsole.conf): "
-            read vcon
-            echo KEYMAP="$vcon" > /etc/vconsole.conf
+            ask "KEYMAP (vconsole.conf): "
+            echo KEYMAP="$inpt" > /etc/vconsole.conf
 
-            echo -n "Set your localtime (ex. Europe/Rome): "
-            read zone
+            ask "Set your localtime (ex. Europe/Rome): "
             echo "Setting localtime..."
-            ln -s /usr/share/zoneinfo/"$zone" /etc/localtime
+            ln -s /usr/share/zoneinfo/"$inpt" /etc/localtime
 
             echo "Setting Hardware Clock..."
             hwclock --systohc --utc
@@ -346,35 +401,27 @@ do
             ########################################
             # NETWORK CONFIGURATION
             ########################################
-            echo -n "Write your hostname: "
-            read host
-            echo "$host" > /etc/hostname
+            ask "Write your hostname: "
+            echo "$inpt" > /etc/hostname
             read -p "Add your hostname to the hosts file... Press a key to continue"
             nano /etc/hosts
 
             while true
             do
-                echo -n "select your network configuration ( w[ireless] - e[th] - s[kip] ): "
-                read ntw
+                ask "select your network configuration ( w[ireless] - e[th] - s[kip] ): "
 
-                case "$ntw" in
+                case "$inpt" in
                     "w")
                         pacman -S $noc iw wpa_supplicant netctl
                         echo
                         echo
                         iw dev
                         echo
-                        echo -n "Do you want to use wifi-menu (y/n) (Enter = y): "
-                        read rewm
-                        if [ "$rewm" == "y" -o "$rewm" == "" ]; then
+                        ask "Do you want to use wifi-menu (y/n) (Enter = y): "
+                        if [ "$inpt" == "y" -o "$inpt" == "" ]; then
                             pacman -S $noc dialog
-                            echo -n "specify an interface (leave blank on most cases): "
-                            read intf
-                            if [ "$intf" != "" ]; then
-                                wifi-menu "$intf"
-                            else
-                                wifi-menu
-                            fi
+                            ask "specify an interface (leave blank on most cases): "
+                            wifi-menu "$inpt"
                             netctl_profile
                         else
                             cp /etc/netctl/examples/wireless-wpa /etc/netctl/examples/my-network
@@ -383,29 +430,25 @@ do
                             netctl enable my-network
                         fi
 
-                        echo -n "Enable netctl-auto? (y/n) (Enter = n): "
-                        read auto
-                        if [ "$auto" == "y" ]; then
+                        ask "Enable netctl-auto? (y/n) (Enter = n): "
+                        if [ "$inpt" == "y" ]; then
                             pacman -S $noc wpa_actiond
                             iw dev
-                            echo -n "specify an interface: "
-                            read intrf
-                            systemctl enable netctl-auto@"$intrf".service
-                        else
-                            echo
+                            ask "specify an interface: "
+                            systemctl enable netctl-auto@"$inpt".service
                         fi
                         break
                         ;;
                     "e")
                         while true
                         do
-                            echo -n "Select a method ( s[tatic IP] - d[hcpcd] ) (Enter = d): "
-                            read ipm
+                            ask "Select a method ( s[tatic IP] - d[hcpcd] ) (Enter = d): "
+                            ipm="$inpt"
                             echo
-                            ip link
+                            ip link | more
                             echo
-                            echo -n "Select your interface: "
-                            read ine
+                            ask "Select your interface: "
+                            ine="$inpt"
                             if [ "$ipm" == "" -o "$ipm" == "d" ]; then
                                 systemctl enable dhcpcd@"$ine".service
                                 break
@@ -413,17 +456,17 @@ do
                                 static_ip "$ine"
                                 break
                             else
-                                invalid
+                                err inv
                             fi
                         done
                         break
                         ;;
                     "s")
-                        skip
+                        err sk
                         break
                         ;;
                     *)
-                        invalid
+                        err inv
                         ;;
                 esac;
             done
@@ -443,77 +486,95 @@ do
             ########################################
             # BOOTLOADER
             ########################################
-            echo -n "Install bootloader? (y/n) (Enter = y): "
-            read boot
-            if [ "$boot" == "y" -o "$boot" == "" ]; then
+            ask "Install bootloader? (y/n) (Enter = y): "
+            if [ "$inpt" == "y" -o "$inpt" == "" ]; then
                 while true
                 do
-                    if [ -d /sys/firmware/efi ]; then
-                        echo -n "Select a bootloader ( gr[ub] - gu[mmiboot] ) (Enter = gr): "
+                    if [ "$efi" == "yes" ]; then
+                        efiboot="- gu[mmiboot] "
                     else
-                        echo -n "Select a bootloader ( gr[ub] ) (Enter = gr): "
+                        efiboot=""
                     fi
-                    read loader
-                    case "$loader" in
+                    ask "Select a bootloader ( gr[ub] $efiboot- s[kip] ) (Enter = gr): "
+                    case "$inpt" in
                         "")
                             ;&
                         "gr")
-                            pacman -S $noc grub
-                            echo -n "Scan all oses? (y/n) (Enter = n): "
-                            read scan
-                            if [ "$scan" == "y" ]; then
-                                pacman -S $noc os-prober
+                            if [ "$efi" == "yes" ]; then
+                                ask "Select the EFI directory (Enter = /boot): /boot/"
+                                if [ "$inpt" == "" -o "$inpt" == "/boot" ]; then
+                                    efid="/boot"
+                                else
+                                    efid="/boot/$inpt"
+                                fi
+                                packs="efibootmgr"
+                                targ="x86_64-efi"
+                                opts="--efi-directory=$efid --bootloader-id=grub"
                             else
-                                skip
+                                ask "Select the target partition for grub: /dev/"
+                                packs=""
+                                targ="i386-pc"
+                                opts="/dev/$inpt"
                             fi
-                            echo -n "Select the target partition for grub: /dev/"
-                            read tpart
-                            grub-install --target=i386-pc --force --recheck /dev/"$tpart"
-                            echo -n "Edit grub parameters? (y/n) (Enter = n): "
-                            read eg
-                            if [ "$eg" == "y" ]; then
+                            pacman -S $noc grub $packs
+                            ask "Scan all oses? (y/n) (Enter = n): "
+                            if [ "$inpt" == "y" ]; then
+                                pacman -S $noc os-prober
+                            fi
+                            grub-install --target="$targ" --force --recheck $opts
+                            ask "Edit grub parameters? (y/n) (Enter = n): "
+                            if [ "$inpt" == "y" ]; then
                                 nano /etc/default/grub
-                            else
-                                echo
                             fi
                             echo "Generating grub config..."
                             grub-mkconfig -o /boot/grub/grub.cfg
+                            ask "Edit grub.cfg? (y/n) (Enter = n): "
+                            if [ "$inpt" == "y" ]; then
+                                nano /boot/grub/grub.cfg
+                            fi
                             break
                             ;;
                         "gu")
+                            if [ "$efi" == "no" ]; then
+                                err inv
+                                continue
+                            fi
                             pacman -S $noc gummiboot
-                            echo -n "Select the target partition for gummiboot: /dev/"
-                            read tpart
-                            gummiboot --path=/dev/"$tpart" install
+                            ask "Select the EFI directory (Enter = /boot): /boot/"
+                            if [ "$inpt" == "" -o "$inpt" == "/boot" ]; then
+                                efid="/boot"
+                            else
+                                efid="/boot/$inpt"
+                            fi
+                            gummiboot --path="$efid" install
                             root="$(df / | awk '/dev/{printf("%s", $1)}')"
-                            echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\tinitramfs-linux.img\\troot=$root rw > /dev/"$tpart"/loader/entries/arch.conf
-                            echo -e default arch\\ntimeout arch > /dev/"$tpart"/loader/loader.conf
+                            echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\tinitramfs-linux.img\\troot=$root rw > "$efid"/loader/entries/arch.conf
+                            echo -e default arch\\ntimeout arch > "$efid"/loader/loader.conf
+                            break
+                            ;;
+                        "s")
+                            err sk
                             break
                             ;;
                         *)
-                            invalid
+                            err inv
                             ;;
                     esac;
                 done
             else
-                if [ "$boot" != "n" ]; then
-                    echo "Assuming 'n'"
-                fi
-                skip
+                err sk
             fi
 
             ########################################
             # CREATE A USER?
             ########################################
-            echo -n "Do you want to create a user? (y/n) (Enter = y): "
-            read user
-            if [ "$user" == "y" -o "$user" == "" ]; then
-                echo -n "Name: "
-                read name
-                echo "Creating user: $name, group: wheel..."
-                useradd -m -g wheel -s /bin/bash "$name"
-                echo "Set $name password: "
-                passwd "$name"
+            ask "Do you want to create a user? (y/n) (Enter = y): "
+            if [ "$inpt" == "y" -o "$inpt" == "" ]; then
+                ask "Name: "
+                echo "Creating user: $inpt, group: wheel..."
+                useradd -m -g wheel -s /bin/bash "$inpt"
+                echo "Set $inpt password: "
+                passwd "$inpt"
                 read -p "Enable sudo, add \"yourname ALL=(ALL) ALL\" without quotes... Press a key to continue"
                 nano /etc/sudoers
             else
@@ -527,30 +588,25 @@ do
             ########################################
             # FIX THAT F* DIRMNGR
             ########################################
-            echo -n "Do you want to fix pacman-key? (dirmngr and server errors) (y/n) (Enter = y): "
-            read fdir
-            if [ "$fdir" == "" -o "$fdir" == "y" ]; then
+            ask "Do you want to fix pacman-key? (dirmngr and server errors) (y/n) (Enter = y): "
+            if [ "$inpt" == "" -o "$inpt" == "y" ]; then
                 fix_pacman_key
             else
-                skip
+                err sk
             fi
 
             ########################################
             # GRAPHIC DRIVER
             ########################################
-            echo -n "List all the graphics cards? (y/n) (Enter = n): "
-            read lgfx
-            if [ "$lgfx" == "y" ]; then
+            ask "List all the graphics cards? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
                 lspci | grep VGA
-            else
-                echo
             fi
 
             while true
             do
-                echo -n "Select a gfx driver ( i[ntel] - a[ti] - c[atalyst] - ca[talyst-hd234k] - n[ouveau] ): "
-                read gfx
-                case "$gfx" in
+                ask "Select a gfx driver ( i[ntel] - a[ti] - c[atalyst] - ca[talyst-hd234k] - n[ouveau] - s[kip] ): "
+                case "$inpt" in
                     "i")
                         pacman -S $noc xf86-video-intel
                         break
@@ -587,8 +643,12 @@ do
                         pacman -S $noc xf86-video-nouveau
                         break
                         ;;
+                    "s")
+                        err sk
+                        break
+                        ;;
                     *)
-                        invalid
+                        err inv
                         ;;
                 esac;
             done
@@ -596,9 +656,8 @@ do
             ########################################
             # AUR
             ########################################
-            echo -n "Do you want to install Yaourt? (y/n) (Enter = n): "
-            read yt
-            if [ "$yt" == "y" ]; then
+            ask "Do you want to install Yaourt? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
                 echo | tee -a /etc/pacman.conf
                 echo "[archlinuxfr]" | tee -a /etc/pacman.conf
                 echo "SigLevel = Never" | tee -a /etc/pacman.conf
@@ -606,20 +665,18 @@ do
                 pacman -Syy
                 pacman -S $noc yaourt
             else
-                skip
+                err sk
             fi
 
             ########################################
             # CUSTOM ACTIONS
             ########################################
-            echo -n "Do you want to load custom.sh? (y/n) (Enter = n): "
-            read cfunc
-            if [ "$cfunc" == "y" ]; then
-                echo -n "Path to your custom.sh: "
-                read cpath
-                source "$cpath"/custom.sh
+            ask "Do you want to load custom.sh? (y/n) (Enter = n): "
+            if [ "$inpt" == "y" ]; then
+                ask "Path to your custom.sh: "
+                source "$inpt"/custom.sh
             else
-                skip
+                err sk
             fi
             break
             ;;
@@ -645,7 +702,7 @@ do
             break
             ;;
         *)
-            invalid
+            err inv
             ;;
     esac;
 done
