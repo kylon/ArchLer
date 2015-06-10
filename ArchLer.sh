@@ -21,7 +21,7 @@ draw_logo() {
     echo    "#      #   ##    ###   ##           ##      ##   ##         ##         ##   ###"
     echo   "#        #  ##    ###   ##########   ##      ##   ########   #########  ##   ###"
     echo
-    echo "v 2.0 -- $bootmode MODE"
+    echo "v 2.5 -- $bootmode MODE"
     echo
     echo
 }
@@ -51,15 +51,23 @@ catalyst_driver() {
     pacman-key -r 653C3094
     pacman-key --lsign-key 653C3094
 
-    read -p "Enable multilib... Press a key to continue"
-    nano /etc/pacman.conf
-    pacman -Syy
+    if [ "$carch" == "x86_64" ]; then
+        read -p "Enable multilib... Press a key to continue"
+        nano /etc/pacman.conf
+        pacman -Syy
+    fi
 
-    ask "Do you have hybrid graphics card? (Intel/AMD) (y/n) (Enter = n): "
+    ask "Do you have hybrid graphic card? (y/n) (Enter = n): "
     if [ "$inpt" == "y" ]; then
-        drvpk="catalyst-utils-pxp lib32-catalyst-utils-pxp xf86-video-intel"
+        if [ "$carch" == "x86_64" ]; then
+            libs="lib32-catalyst-utils-pxp"
+        fi
+        drvpk="catalyst-utils-pxp xf86-video-intel $libs"
     else
-        drvpk="catalyst-utils catalyst-libgl opencl-catalyst lib32-catalyst-utils lib32-catalyst-libgl lib32-opencl-catalyst"
+        if [ "$carch" == "x86_64" ]; then
+            libs="lib32-catalyst-utils lib32-catalyst-libgl lib32-opencl-catalyst"
+        fi
+        drvpk="catalyst-utils catalyst-libgl opencl-catalyst $libs"
     fi
 
     pacman -S $noc catalyst-hook qt4 $drvpk
@@ -72,13 +80,36 @@ catalyst_driver() {
         nano /etc/default/grub
         grub-mkconfig -o /boot/grub/grub.cfg
     else
-        echo -n nomodeset >> /boot/loader/entries/arch.conf
+        read -p "Add nomodeset to your gummiboot boot parameters... Press a key to continue"
+        nano /boot/loader/entries/arch.conf
     fi
 
     echo "Blacklisting radeon..."
     echo 'radeon' | tee -a /etc/modprobe.d/modprobe.conf > /dev/null
     echo "Running aticonfig..."
     aticonfig --initial
+}
+
+nvidia_driver() {
+    ask "Do you have hybrid graphic card? (y/n) (Enter = n): "
+    if [ "$inpt" == "y" ]; then
+        pacman -S $noc bumblebee xf86-video-intel mesa
+        ask "Your username: "
+        gpasswd -a "$inpt" bumblebee
+        systemctl enable bumblebeed.service
+
+        if [ "$carch" == "x86_64" ]; then
+            ask "Do you want to enable 32bit application support (y/n): "
+            if [ "$inpt" == "y" ]; then
+                read -p "Enable multilib... Press a key to continue"
+                nano /etc/pacman.conf
+                pacman -Syy
+                pacman -S $noc lib32-mesa-libgl
+            fi
+        fi
+
+        echo "Changes will take effect after a reboot. Use the shell program optirun for nvidia rendering"
+    fi
 }
 
 static_ip() {
@@ -123,6 +154,7 @@ check() {
 i="-i"
 noc=""
 efi="no"
+carch="$(uname -m)"
 
 if [ -d /sys/firmware/efi ]; then
     efi="yes"
@@ -164,7 +196,7 @@ do
             do
                 ask "select your network configuration ( w[ireless] - e[th - static IP] - s[kip] ): "
 
-		case "$inpt" in
+                case "$inpt" in
                     "w")
                         iw dev
                         ask "Do you want to use wifi-menu (y/n) (Enter = y): "
@@ -174,7 +206,7 @@ do
                         else
                             ask "Select an interface: "
                             ip link set "$inpt" up
-							intfc="$inpt"
+                            intfc="$inpt"
                             iw dev "$inpt" scan | grep SSID
                             ask "Select your SSID: "
                             ssid="$inpt"
@@ -548,8 +580,16 @@ do
                             fi
                             gummiboot --path="$efid" install
                             root="$(df / | awk '/dev/{printf("%s", $1)}')"
-                            echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\tinitramfs-linux.img\\troot=$root rw > "$efid"/loader/entries/arch.conf
-                            echo -e default arch\\ntimeout arch > "$efid"/loader/loader.conf
+                            echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\t/initramfs-linux.img\\noptions\\troot=$root rw > "$efid"/loader/entries/arch.conf
+                            echo -e default arch\\ntimeout 4 > "$efid"/loader/loader.conf
+                            ask "Edit arch.conf? (y/n) (Enter = n): "
+                            if [ "$inpt" == "y" ]; then
+                                nano "$efid"/loader/entries/arch.conf
+                            fi
+                            ask "Edit loader.conf? (y/n) (Enter = n): "
+                            if [ "$inpt" == "y" ]; then
+                                nano "$efid"/loader/loader.conf
+                            fi
                             break
                             ;;
                         "s")
@@ -605,45 +645,32 @@ do
 
             while true
             do
-                ask "Select a gfx driver ( i[ntel] - a[ti] - c[atalyst] - ca[talyst-hd234k] - n[ouveau] - s[kip] ): "
+                ask "Select your graphic card ( g[eneric] - i[ntel] - a[md] - n[vidia] - s[kip] ) (Enter = i): "
                 case "$inpt" in
+                    "g")
+                        menu=""
+                        pacman -S $noc xf86-video-vesa
+                        break
+                        ;;
+                    "")
+                        ;&
                     "i")
-                        pacman -S $noc xf86-video-intel
+                        menu="Select your graphic driver ( i[ntel HD/IRIS PRO] ) (Enter = i): "
+                        selected="i"
                         break
                         ;;
                     "a")
-                        pacman -S $noc xf86-video-ati
-                        break
-                        ;;
-                    "c")
-                        echo "Adding catalyst repo to pacman.conf..."
-                        echo | tee -a /etc/pacman.conf
-                        echo "[catalyst]" | tee -a /etc/pacman.conf
-                        echo "Server = http://catalyst.wirephire.com/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
-                        echo "## Mirrors, if the primary server does not work or is too slow:" | tee -a /etc/pacman.conf
-                        echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
-                        echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
-                        echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" | tee -a /etc/pacman.conf
-                        catalyst_driver
-                        break
-                        ;;
-                    "ca")
-                        echo "Adding catalyst-hd234k repo to pacman.conf..."
-                        echo | tee -a /etc/pacman.conf
-                        echo "[catalyst-hd234k]" | tee -a /etc/pacman.conf
-                        echo "Server = http://catalyst.wirephire.com/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
-                        echo "## Mirrors, if the primary server does not work or is too slow:" | tee -a /etc/pacman.conf
-                        echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
-                        echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
-                        echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
-                        catalyst_driver
+                        menu="Select your graphic driver ( a[ti] - c[atalyst] - ca[talyst-hd234k] ) (Enter = a): "
+                        selected="a"
                         break
                         ;;
                     "n")
-                        pacman -S $noc xf86-video-nouveau
+                        menu="Select your graphic driver ( n[ouveau] - nv[idia - GF 400+] - nvi[dia GF 8/9xxx - 100-300] - nvid[ia - GF 6/7xxx] ) (Enter = n): "
+                        selected="n"
                         break
                         ;;
                     "s")
+                        menu=""
                         err sk
                         break
                         ;;
@@ -652,6 +679,101 @@ do
                         ;;
                 esac;
             done
+
+            if [ "$menu" != "" ]; then
+                while true
+                do
+                    ask "$menu"
+                    case "$inpt" in
+                        "i")
+                            if [ "$selected" != "i" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc xf86-video-intel
+                            break
+                            ;;
+                        "a")
+                            if [ "$selected" != "a" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc xf86-video-ati
+                            break
+                            ;;
+                        "n")
+                            if [ "$selected" != "n" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc xf86-video-nouveau
+                            break
+                            ;;
+                        "c")
+                            if [ "$selected" != "a" ]; then
+                                err inv
+                                continue
+                            fi
+                            echo "Adding catalyst repo to pacman.conf..."
+                            echo | tee -a /etc/pacman.conf
+                            echo "[catalyst]" | tee -a /etc/pacman.conf
+                            echo "Server = http://catalyst.wirephire.com/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
+                            echo "## Mirrors, if the primary server does not work or is too slow:" | tee -a /etc/pacman.conf
+                            echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
+                            echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst/\$arch" | tee -a /etc/pacman.conf
+                            echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst/\$arch" | tee -a /etc/pacman.conf
+                            catalyst_driver
+                            break
+                            ;;
+                        "ca")
+                            if [ "$selected" != "a" ]; then
+                                err inv
+                                continue
+                            fi
+                            echo "Adding catalyst-hd234k repo to pacman.conf..."
+                            echo | tee -a /etc/pacman.conf
+                            echo "[catalyst-hd234k]" | tee -a /etc/pacman.conf
+                            echo "Server = http://catalyst.wirephire.com/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                            echo "## Mirrors, if the primary server does not work or is too slow:" | tee -a /etc/pacman.conf
+                            echo "#Server = http://70.239.162.206/catalyst-mirror/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                            echo "#Server = http://mirror.rts-informatique.fr/archlinux-catalyst/repo/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                            echo "#Server = http://mirror.hactar.bz/Vi0L0/catalyst-hd234k/\$arch" | tee -a /etc/pacman.conf
+                            catalyst_driver
+                            break
+                            ;;
+                        "nv")
+                            if [ "$selected" != "n" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc nvidia
+                            nvidia_driver
+                            break
+                            ;;
+                        "nvi")
+                            if [ "$selected" != "n" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc nvidia-340xx
+                            nvidia_driver
+                            break
+                            ;;
+                        "nvid")
+                            if [ "$selected" != "n" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc  nvidia-304xx
+                            nvidia_driver
+                            break
+                            ;;
+                        *)
+                            err inv
+                            ;;
+                    esac;
+                done
+            fi
 
             ########################################
             # AUR
@@ -689,9 +811,6 @@ do
             echo "[s]: Initial configuration (arch-chroot);"
             echo
             echo "[c]: Customize your ArchLinux box. This option gives you the ability to load an external script (custom.sh);"
-            echo
-            echo "Some things are still missing, like a full efi support, nvidia nonfree drivers and more."
-            echo "A manual installation/configuration is required for thoose packages."
             echo
             echo "Contributors:"
             echo "maxweis (gummiboot support)"

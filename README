@@ -22,6 +22,8 @@ Changes:
         clean up
     2.0
         efi support, clean up and fixes
+    2.5
+        fix gummiboot, rework graphics driver installation
 
 Contributors:
 - maxweis (gummiboot support)
