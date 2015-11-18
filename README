@@ -9,7 +9,7 @@ Welcome to ArchLer!
 This script will help you to install ArchLinux quickly.
 
 Choose (i) to install ArchLinux, choose (s) to complete the installation in chroot, choose (c) to customize your ArchLinux box.
-The (c) option gives you the ability to load an external script (custom.sh) to do everything you need to complete the configuration of your newly installed os.
+The (c) option gives you the ability to load an external script (AnyName.sh) to do everything you need to complete the configuration of your newly installed os.
 
 Changes:
     1.1
@@ -20,6 +20,8 @@ Changes:
         efi support, clean up and fixes
     2.5
         fix gummiboot, rework graphics driver installation
+    3.0
+	 systemd-boot support (previously gummiboot), rEFInd support, fixes and inprovements
 
 Contributors:
 - maxweis (gummiboot support)

@@ -21,7 +21,7 @@ draw_logo() {
     echo    "#      #   ##    ###   ##           ##      ##   ##         ##         ##   ###"
     echo   "#        #  ##    ###   ##########   ##      ##   ########   #########  ##   ###"
     echo
-    echo "v 2.5 -- $bootmode MODE"
+    echo "v 3.0 -- $bootmode MODE"
     echo
     echo
 }
@@ -523,7 +523,7 @@ do
                 while true
                 do
                     if [ "$efi" == "yes" ]; then
-                        efiboot="- gu[mmiboot] "
+                        efiboot="- sy[stemd-boot] - re[efind] "
                     else
                         efiboot=""
                     fi
@@ -566,19 +566,18 @@ do
                             fi
                             break
                             ;;
-                        "gu")
+                        "sy")
                             if [ "$efi" == "no" ]; then
                                 err inv
                                 continue
                             fi
-                            pacman -S $noc gummiboot
                             ask "Select the EFI directory (Enter = /boot): /boot/"
                             if [ "$inpt" == "" -o "$inpt" == "/boot" ]; then
                                 efid="/boot"
                             else
                                 efid="/boot/$inpt"
                             fi
-                            gummiboot --path="$efid" install
+                            bootctl --path="$efid" install
                             root="$(df / | awk '/dev/{printf("%s", $1)}')"
                             echo -e title\\tArch Linux\\nlinux\\t/vmlinuz-linux\\ninitrd\\t/initramfs-linux.img\\noptions\\troot=$root rw > "$efid"/loader/entries/arch.conf
                             echo -e default arch\\ntimeout 4 > "$efid"/loader/loader.conf
@@ -590,6 +589,15 @@ do
                             if [ "$inpt" == "y" ]; then
                                 nano "$efid"/loader/loader.conf
                             fi
+                            break
+                            ;;
+                        "re")
+                            if [ "$efi" == "no" ]; then
+                                err inv
+                                continue
+                            fi
+                            pacman -S $noc refind-efi efibootmgr
+                            refind-install
                             break
                             ;;
                         "s")
@@ -647,16 +655,16 @@ do
             do
                 ask "Select your graphic card ( g[eneric] - i[ntel] - a[md] - n[vidia] - s[kip] ) (Enter = i): "
                 case "$inpt" in
-                    "g")
-                        menu=""
-                        pacman -S $noc xf86-video-vesa
-                        break
-                        ;;
                     "")
                         ;&
                     "i")
                         menu="Select your graphic driver ( i[ntel HD/IRIS PRO] ) (Enter = i): "
                         selected="i"
+                        break
+                        ;;
+                    "g")
+                        menu=""
+                        pacman -S $noc xf86-video-vesa
                         break
                         ;;
                     "a")
@@ -685,6 +693,8 @@ do
                 do
                     ask "$menu"
                     case "$inpt" in
+                        "")
+                            ;&
                         "i")
                             if [ "$selected" != "i" ]; then
                                 err inv
@@ -791,12 +801,12 @@ do
             fi
 
             ########################################
-            # CUSTOM ACTIONS
+            # CUSTOM SCRIPT
             ########################################
-            ask "Do you want to load custom.sh? (y/n) (Enter = n): "
+            ask "Do you want to load a custom script? (y/n) (Enter = n): "
             if [ "$inpt" == "y" ]; then
-                ask "Path to your custom.sh: "
-                source "$inpt"/custom.sh
+                ask "Name of your script (without .sh): "
+                source Ascript/"$inpt".sh
             else
                 err sk
             fi
